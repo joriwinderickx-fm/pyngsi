@@ -259,3 +259,68 @@ class SinkOrion(SinkHttp):
             self.headers['Fiware-Service'] = service
         if servicepath is not None:
             self.headers['Fiware-ServicePath'] = servicepath
+
+
+class SinkScorpio(SinkHttp):
+    """Send to Scorpio Context Broker"""
+
+    def __init__(self, hostname="127.0.0.1", port="9090", secure=False, baseurl="/",
+                 post_endpoint="/ngsi-ld/v1/entities", post_query="options=upsert", status_endpoint="/scorpio/v1/info/health",
+                 useragent=f"NgsiAgent v{version}", proxy=None,
+                 token=None, service=None, servicepath=None):
+        logger.debug("init SinkOrion")
+        super().__init__(hostname, port, secure, baseurl,
+                         post_endpoint, post_query, status_endpoint,
+                         useragent, proxy)
+        self.headers['Content-Type'] = 'application/ld+json'
+        if 'X-Auth-Token' in self.headers:
+            logger.info(
+                "A token has already been provided to the pyngsi framework.")
+        else:
+            if token:
+                logger.info("A token has been set programmatically.")
+            elif token := os.environ.get('ORION_TOKEN', None):
+                logger.info("A token has been found in environment variable.")
+            else:
+                try:
+                    with open('/run/secrets/orion_token') as f:
+                        token = f.read()  # 2nd try to get the token from a given file (Docker Secret mode)
+                        token = token.rstrip(" \r\n")
+                except Exception:
+                    pass
+                else:
+                    logger.info("A token has been found in docker secrets.")
+            if token:  # a token has been found
+                logger.info("Use token for authentication")
+                # add the token to the Authorization header
+                self.headers['X-Auth-Token'] = token
+            else:
+                logger.info(
+                    "No token found. Request Orion without authentication.")
+
+        if service is not None:
+            self.headers['Fiware-Service'] = service
+        if servicepath is not None:
+            self.headers['Fiware-ServicePath'] = servicepath
+    
+    def create_entity(self, msg):
+        """Sends HTTP POST request with the NGSI-LD data to create entity instance
+
+        Parameters
+        ----------
+        msg: str
+            the NGSI-LD data
+        """
+
+        try:
+            r = self.session.post(
+                f"{self.prefix}/ngsi-ld/v1/entities", msg, headers=self.headers,
+                proxies={self.proxy} if self.proxy else None)
+            logger.trace(dump.dump_all(r).decode('utf-8'))
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            raise SinkException(
+                f"cannot write to SinkHttp : {e}\nServer returned : {r.text}\nrecord={msg}")
+        except Exception as e:
+            raise SinkException(
+                f"cannot write to SinkHttp : {e}\nrecord={msg}")
