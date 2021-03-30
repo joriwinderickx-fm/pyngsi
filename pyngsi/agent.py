@@ -229,6 +229,7 @@ class NgsiAgentPullBatch(NgsiAgentPull):
     
     def trigger(self):
         self.triggered = True
+        logger.info("Triggered batch completion")
 
 
 
