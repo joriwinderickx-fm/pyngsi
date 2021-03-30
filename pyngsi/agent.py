@@ -165,7 +165,7 @@ class NgsiAgentPull(NgsiAgent):
         self.source.reset()
         self.stats.zero()
 
-class NgsiAgentPullBatch(NgsiAgent):
+class NgsiAgentPullBatch(NgsiAgentPull):
 
     """
     The NgsiAgentPull pulls rows from the datasource in batches
@@ -191,7 +191,7 @@ class NgsiAgentPullBatch(NgsiAgent):
     def run(self):
         logger.info("start to acquire data")
         # Create batch
-        batch = Row("", None)
+        batch = None
         entry = 0
         for row in self.source:
             logger.debug(row)
@@ -204,22 +204,23 @@ class NgsiAgentPullBatch(NgsiAgent):
                 if not x:
                     self.stats.filtered += 1
                     continue
+                batch = x
                 self.stats.processed += 1
                 entry += 1
 
-                if entry == self.batch_size - 1:
+                if entry == self.batch_size:
                     self.triggered = True
                 
                 if self.triggered:
-                    msg = x.json() if isinstance(x, DataModel) else x
+                    msg = batch.json() if isinstance(batch, DataModel) else batch
                     self.sink.write(msg)
                     self.stats.output += 1
                     if self.side_effect:
-                        side_entities = self.side_effect(row, self.sink, x)
+                        side_entities = self.side_effect(row, self.sink, batch)
                         self.stats.side_entities += side_entities
                     #Clear batch
                     self.triggered = False
-                    batch = Row("", None)
+                    batch = None
                     entry = 0
             except Exception as e:
                 self.stats.error += 1
