@@ -165,6 +165,71 @@ class NgsiAgentPull(NgsiAgent):
         self.source.reset()
         self.stats.zero()
 
+class NgsiAgentPullBatch(NgsiAgent):
+
+    """
+    The NgsiAgentPull pulls rows from the datasource in batches
+    """
+
+    def __init__(self,
+                 source: Source = None,
+                 sink: Sink = None,
+                 process: Callable = lambda row, *args, **kwargs: row.record,
+                 batch_size: int = 0,
+                 side_effect: Callable = None):
+        logger.info("init NGSI agent")
+        self.source = source if source else SourceStream(sys.stdin)
+        logger.info(f"source = [{self.source.__class__.__name__}]")
+        self.sink = sink if sink else SinkStdout()
+        logger.info(f"sink = [{self.sink.__class__.__name__}]")
+        self.process = process
+        self.side_effect = side_effect
+        self.stats = NgsiAgent.Stats()
+        self.triggered = False
+        self.batch_size = batch_size
+
+    def run(self):
+        logger.info("start to acquire data")
+        # Create batch
+        batch = Row("", None)
+        entry = 0
+        for row in self.source:
+            logger.debug(row)
+            try:
+                if row.provider is None:
+                    row.provider = "user"
+                logger.trace(f"{row.provider=}\t{row.record=}")
+                self.stats.input += 1
+                x = self.process(batch, row)
+                if not x:
+                    self.stats.filtered += 1
+                    continue
+                self.stats.processed += 1
+                entry += 1
+
+                if entry == self.batch_size - 1:
+                    self.triggered = True
+                
+                if self.triggered:
+                    msg = x.json() if isinstance(x, DataModel) else x
+                    self.sink.write(msg)
+                    self.stats.output += 1
+                    if self.side_effect:
+                        side_entities = self.side_effect(row, self.sink, x)
+                        self.stats.side_entities += side_entities
+                    #Clear batch
+                    self.triggered = False
+                    batch = Row("", None)
+                    entry = 0
+            except Exception as e:
+                self.stats.error += 1
+                logger.error(f"Cannot process record : {e}")
+        return self
+    
+    def trigger(self):
+        self.triggered = True
+
+
 
 class NgsiAgentServer(NgsiAgent):
 
