@@ -314,7 +314,7 @@ class SinkScorpio(SinkHttp):
 
         try:
             r = self.session.post(
-                f"{self.prefix}/ngsi-ld/v1/entities", msg, headers=self.headers,
+                self.post_url[:self.post_url.index("/entities") + len("/entities")], msg, headers=self.headers,
                 proxies={self.proxy} if self.proxy else None)
             logger.trace(dump.dump_all(r).decode('utf-8'))
             r.raise_for_status()
