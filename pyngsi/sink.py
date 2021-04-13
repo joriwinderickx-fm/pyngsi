@@ -324,3 +324,26 @@ class SinkScorpio(SinkHttp):
         except Exception as e:
             raise SinkException(
                 f"cannot write to SinkHttp : {e}\nrecord={msg}")
+
+    
+    def delete_entity(self, id):
+        """Sends HTTP POST request with the NGSI-LD data to create entity instance
+
+        Parameters
+        ----------
+        id: str
+            the NGSI-LD uri of the entity
+        """
+
+        try:
+            r = self.session.delete(
+                (self.post_url[:self.post_url.index("/entities") + len("/entities")] + f"/{id}"), headers=self.headers,
+                proxies={self.proxy} if self.proxy else None)
+            logger.trace(dump.dump_all(r).decode('utf-8'))
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            raise SinkException(
+                f"cannot write to SinkHttp : {e}\nServer returned : {r.text}\nrecord={id}")
+        except Exception as e:
+            raise SinkException(
+                f"cannot write to SinkHttp : {e}\nrecord={id}")
