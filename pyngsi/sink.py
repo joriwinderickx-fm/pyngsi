@@ -261,8 +261,8 @@ class SinkOrion(SinkHttp):
             self.headers['Fiware-ServicePath'] = servicepath
 
 
-class SinkScorpio(SinkHttp):
-    """Send to Scorpio Context Broker"""
+class SinkNGSILD(SinkHttp):
+    """Send to NGSI-LD(-Temporal) Context Broker"""
 
     def __init__(self, hostname="127.0.0.1", port="9090", secure=False, baseurl="/",
                  post_endpoint="/ngsi-ld/v1/entities", post_query="options=upsert", status_endpoint="/scorpio/v1/info/health",
